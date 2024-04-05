@@ -1,0 +1,87 @@
+# Comments are provided throughout this file to help you get started.
+# If you need more help, visit the Docker Compose reference guide at
+# https://docs.docker.com/go/compose-spec-reference/
+
+# Here the instructions define your application as a service called "server".
+# This service is built from the Dockerfile in the current directory.
+# You can add other services your application may depend on here, such as a
+# database or a cache. For examples, see the Awesome Compose repository:
+# https://github.com/docker/awesome-compose
+services:
+  server:
+    build:
+      context: .
+    # Name the service "py-svc" and run the container on port 5000.
+    image: py-svc
+    # Enable reloads when code changes are detected.
+    command: flask run --host=0.0.0.0 --port=5000 --reload
+    ports:
+      - 5000:5000
+
+    environment:
+     - POSTGRES_PASSWORD_FILE=/run/secrets/db-password
+
+# The commented out section below is an example of how to define a PostgreSQL
+# database that your application can use. `depends_on` tells Docker Compose to
+# start the database before your application. The `db-data` volume persists the
+# database data between container restarts. The `db-password` secret is used
+# to set the database password. You must create `db/password.txt` and add
+# a password of your choosing to it before running `docker compose up`.
+    depends_on:
+      db:
+        condition: service_healthy
+    secrets:
+      - db-password
+
+    # Mount the current directory into the container to ensure that code changes
+    # are automatically reflected inside the container. This is a common pattern
+    # used for local development because it allows you to change code without
+    # having to rebuild the image.
+    volumes:
+      - .:/app
+
+  db:
+    image: postgres
+    restart: always
+    user: postgres
+    ports:
+      # Connect to localhost:5432, database: example, username: postgres
+      # For password, see the `db-password` secret below
+      - 5432:5432
+    secrets:
+      # The `db-password` secret is used to set the database password.
+      # You must create `db/password.txt` and add a password of your choosing
+      # to it before running `docker compose up`.
+      - db-password
+    volumes:
+      # Persist the database data between container restarts.
+      # This is a common pattern used for databases. The db-data volume is
+      # created automatically when you run `docker compose up`.
+      - db-data:/var/lib/postgresql/data
+      # Connect to it with a command like this:
+      # `docker run -it --rm -v python-docker-dev_db-data:/vol alpine sh`
+      # (...where all the files on the volume will be in the /vol folder)
+    environment:
+      - POSTGRES_DB=example
+      - POSTGRES_PASSWORD_FILE=/run/secrets/db-password
+    expose:
+      - 5432
+    # Define health checks to wait until the database is ready to accept connections.
+    # For more information, see https://docs.docker.com/compose/compose-file/compose-file-v3/#healthcheck
+    # For more information on `pg_isready`, see https://www.postgresql.org/docs/current/app-pg-isready.html
+    healthcheck:
+      test: [ "CMD", "pg_isready" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+volumes:
+  # Persist the database data between container restarts.
+  # This is a common pattern used for databases.
+  # The db-data volume is created automatically when you run `docker compose up`.
+  # You can also create it in advance using `docker volume create --name=db-data`.
+  # For more information, see https://docs.docker.com/storage/volumes/
+  db-data:
+secrets:
+  db-password:
+    file: db/password.txt
+
